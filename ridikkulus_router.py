@@ -23,6 +23,7 @@ from router_base.mac_address import MacAddress
 from router_base.ip_address import IpAddress
 from router_base.interface import Interface
 from router_base.utils import checksum, print_hdrs
+from router_base import headers
 
 import sys
 
@@ -38,11 +39,14 @@ class SimpleRouter(SimpleRouterBase):
     #
     def handlePacket(self, origPacket, inIface):
         print("Got packet of size %d on interface %s" % (len(origPacket), inIface), file=sys.stderr)
+        
 
         iface = self.findIfaceByName(inIface)
         if not iface:
             print("Received packet, but interface is unknown, ignoring", file=sys.stderr)
             return
+
+        
 
         # all incoming packets are guaranteed to be Ethernet, so unconditionally process them as Ethernet
         self.processEther(origPacket, iface)
@@ -66,10 +70,13 @@ class SimpleRouter(SimpleRouterBase):
         # need to check those, if any question
 
         if etherHeader.type == 0x0806:
-            self.processArp(self, restOfPacket, etherHeader, iface)
+            print("GOT ARP")
+            print(iface)
+            self.processArp( restOfPacket, etherHeader, iface)
         elif etherHeader.type == 0x0800:
-            self.processIp(self, restOfPacket, iface)
-        else
+            print("GOT IP")
+            self.processIp( restOfPacket, iface)
+        else:
             # ignore packets that neither ARP nor IP
             pass
 
@@ -91,6 +98,25 @@ class SimpleRouter(SimpleRouterBase):
           that corresponds to this IP.  If no IP found, then request is not for you and should be ignored.
         - if it is response, then you should decode and call self.arpCache.handleIncomingArpReply()
         '''
+        pkt = headers.ArpHeader(arpPacket)
+
+        if pkt.op == 1:
+            if self.findIfaceByIp(pkt.tip) != None:
+                pkt = headers.ArpHeader()
+                offset = pkt.decode(arpPacket)
+
+                pkt.tip = "1.1.1.1"
+                pkt.tha = "ff:ff:ff:ff:ff:ff"
+
+                self.sendPacket(pkt.encode(),iface.name)
+
+            else:
+                pass
+        elif pkt.op == 2:
+            print(iface)
+            self.arpCache.handleIncomingArpReply(pkt, iface)
+            
+
         pass
 
     def processIp(self, ipPacket, iface):
