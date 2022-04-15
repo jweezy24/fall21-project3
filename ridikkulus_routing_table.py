@@ -18,7 +18,10 @@ class RoutingTable(RoutingTableBase):
 
     def lookup(self, ip):
         """Lookup entry in the routing table (longest prefix match)"""
-
+        
+        for i in self.entries:
+            if i.ip ==ip:
+                return i 
         # Hints:
         # - Iterate over entries
         # for entry in self.entries:

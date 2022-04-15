@@ -48,6 +48,7 @@ class ArpCache(ArpCacheBase):
         found = self.lookup(pkt.sip)
         req = self.insertArpEntry(pkt.sha, pkt.ip)
         if request:
+            self.resendOrRemoveQueuedRequest(req)
             self.removeRequest(req)
         else:
             self.queueRequest(pkt.ip, pkt, iface)
@@ -72,6 +73,24 @@ class ArpCache(ArpCacheBase):
                     req.timeSent = time.time()
                     req.nTimesSent++
         '''
+
+
+        if now - req.timeSent > 1: # seconds
+            if req.nTimesSent >= 5:
+                #send icmp host unreachable to source addr of all pkts waiting on this request
+                self.removeRequest(req)
+            else:
+                # send arp request
+                pkt = headers.ArpHeader()
+                offset = pkt.decode(req)
+
+                pkt.tip = "1.1.1.1"
+                pkt.tha = "ff:ff:ff:ff:ff:ff"
+
+                self.sendPacket(pkt.encode(),iface.name)
+                self.router.sendPacket()
+                req.timeSent = time.time()
+                req.nTimesSent+=1
 
         pass
 

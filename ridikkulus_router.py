@@ -76,6 +76,7 @@ class SimpleRouter(SimpleRouterBase):
         elif etherHeader.type == 0x0800:
             print("GOT IP")
             self.processIp( restOfPacket, iface)
+
         else:
             # ignore packets that neither ARP nor IP
             pass
@@ -99,16 +100,28 @@ class SimpleRouter(SimpleRouterBase):
         - if it is response, then you should decode and call self.arpCache.handleIncomingArpReply()
         '''
         pkt = headers.ArpHeader(arpPacket)
-
+        print(pkt)
         if pkt.op == 1:
+            oface = self.findIfaceByIp(pkt.tip)
             if self.findIfaceByIp(pkt.tip) != None:
-                pkt = headers.ArpHeader()
-                offset = pkt.decode(arpPacket)
 
-                pkt.tip = "1.1.1.1"
-                pkt.tha = "ff:ff:ff:ff:ff:ff"
+                pkt = headers.ArpHeader(arpPacket)
+                print(dir(oface))
+                
+                pkt.pro = 0x0800
+                pkt.tip = pkt.sip
+                pkt.tha = pkt.sha
 
-                self.sendPacket(pkt.encode(),iface.name)
+                pkt.sip = oface.ip
+                pkt.tha = oface.mac
+
+                pkt.op = 2
+                
+                # pkt.tip = "1.1.1.1"
+                # pkt.tha = "ff:ff:ff:ff:ff:ff"
+                print("SENDING PACKET")
+                print(pkt)
+                self.sendPacket(pkt.encode(),oface.name)
 
             else:
                 pass
@@ -135,6 +148,9 @@ class SimpleRouter(SimpleRouterBase):
         - If it is for the router, then call self.processIpToSelf
         '''
         pass
+        print("GOT IP")
+        print(ipPacket)
+
 
 
     def processIpToSelf(self, ipPacket, origIpHeader, iface):
