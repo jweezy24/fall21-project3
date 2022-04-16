@@ -68,11 +68,42 @@ class SimpleRouter(SimpleRouterBase):
         # Study fields available in each header in router_base/headers.py.
         # All fields there follow the correspodning specifications, so you may
         # need to check those, if any question
-
+        
+        print(f"pkt type  = {hex(etherHeader.type)}")
+        print(f"pkt type  = {etherHeader}")
         if etherHeader.type == 0x0806:
             print("GOT ARP")
             print(iface)
-            self.processArp( restOfPacket, etherHeader, iface)
+            new_pkt = headers.EtherHeader()
+            out_pkt,oface = self.processArp( restOfPacket, etherHeader, iface)
+            tmp_pkt = headers.ArpHeader()
+
+            offset = tmp_pkt.decode(out_pkt.encode())
+
+            new_pkt2 = headers.EtherHeader(shost=out_pkt.sha, dhost=out_pkt.tha, type=0x0800 )
+
+            new_pkt = headers.IcmpHeader(type=0, code=0, sum=checksum(out_pkt.encode()[offset:]), id=50522, seqNum=2, data=out_pkt.encode()[offset:])
+
+            new_pkt.sip = out_pkt.sip
+            new_pkt.sha = out_pkt.sha
+            new_pkt.tip = out_pkt.tip
+            new_pkt.tha = out_pkt.tha
+
+            new_pkt2 = headers.EtherHeader(shost=out_pkt.sha, dhost=out_pkt.tha, type=0x0800 )
+
+            tmp_pkt = headers.IcmpHeader()
+
+            offset = tmp_pkt.decode(new_pkt.encode())
+
+
+
+            # print(headers.EtherHeader(new_pkt))
+            print(headers.IcmpHeader(new_pkt.encode()))
+
+            # new_pkt = new_pkt2.encode() + new_pkt.encode()[offset:]
+
+            self.sendPacket( new_pkt.encode(), iface.name )
+
         elif etherHeader.type == 0x0800:
             print("GOT IP")
             self.processIp( restOfPacket, iface)
@@ -106,22 +137,17 @@ class SimpleRouter(SimpleRouterBase):
             if self.findIfaceByIp(pkt.tip) != None:
 
                 pkt = headers.ArpHeader(arpPacket)
-                print(dir(oface))
                 
                 pkt.pro = 0x0800
                 pkt.tip = pkt.sip
                 pkt.tha = pkt.sha
 
                 pkt.sip = oface.ip
-                pkt.tha = oface.mac
+                pkt.sha = oface.mac
 
                 pkt.op = 2
-                
-                # pkt.tip = "1.1.1.1"
-                # pkt.tha = "ff:ff:ff:ff:ff:ff"
-                print("SENDING PACKET")
-                print(pkt)
-                self.sendPacket(pkt.encode(),oface.name)
+
+                return pkt,oface
 
             else:
                 pass
@@ -147,9 +173,7 @@ class SimpleRouter(SimpleRouterBase):
           If no interface found, then this packet is for someone else and you should call self.processIpToForward()
         - If it is for the router, then call self.processIpToSelf
         '''
-        pass
-        print("GOT IP")
-        print(ipPacket)
+        pkt = headers.IpHeader(buf)
 
 
 
